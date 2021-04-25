@@ -2,7 +2,7 @@ package main
 
 import (
 	"bufio"
-	"encoding/json"
+	"flag"
 	"fmt"
 	"os/exec"
 	"strconv"
@@ -18,7 +18,7 @@ type Tags struct {
 // Tag represents a measurement from a tag
 type Tag struct {
 	// CreateDate         time.Time `json:"createDate"`
-	//HumidityOffsetDate  time.Time `json:"humidityOffsetDate"`
+	// HumidityOffsetDate  time.Time `json:"humidityOffsetDate"`
 	AccelX          float32   `json:"accelX"`
 	AccelY          float32   `json:"accelY"`
 	AccelZ          float32   `json:"accelZ"`
@@ -65,12 +65,16 @@ func parseRaw(raw []uint8) {
 				tmp >>= 5
 				return float32(uint32(tmp))/1000. + 1.6
 			}()
-			m := func() uint8 {
+			mov := func() uint8 {
 				return raw[36]
 			}()
 			seqno := func() uint16 {
 				return uint16(raw[37])<<8 | uint16(raw[38])
 			}()
+
+			if *verbose {
+				fmt.Printf("%v %.2f %.2f %.2f %d\n", mac, t, h, p, mov)
+			}
 			//fmt.Printf("%v %.2f %.2f %.2f %.2f %d\n", mac, t, h, p, v, m)
 			tag := Tag{
 				DataFormat:      5,
@@ -83,7 +87,7 @@ func parseRaw(raw []uint8) {
 				Humidity:        h,
 				Pressure:        p,
 				Voltage:         v,
-				MovementCounter: m,
+				MovementCounter: mov,
 				SeqNo:           seqno,
 				RSSI:            func() int8 { return int8(raw[45]) }(),
 			}
@@ -104,8 +108,8 @@ func parseRaw(raw []uint8) {
 			tags := Tags{}
 			tags.Tags = append(tags.Tags, tag)
 
-			tagStr, _ := json.MarshalIndent(tags, "", "  ")
-			fmt.Println(string(tagStr))
+			// tagStr, _ := json.MarshalIndent(tags, "", "  ")
+			// fmt.Println(string(tagStr))
 		}
 	}
 }
@@ -148,7 +152,14 @@ func parseDump() {
 	}
 }
 
+var verbose = flag.Bool("verbose", false, "verbose mode")
+
+func init() {
+	flag.BoolVar(verbose, "v", false, "verbose mode")
+}
+
 func main() {
+	flag.Parse()
 	scan()
 	parseDump()
 }
