@@ -14,8 +14,9 @@ import (
 )
 
 type Tags struct {
-	Tags         []Tag `json:"tags"`
-	BatteryLevel int   `json:"batteryLevel"`
+	Tags         []Tag  `json:"tags"`
+	Gateway      string `json:"gateway,omitempty"`
+	BatteryLevel int    `json:"batteryLevel"`
 }
 
 // Tag represents a measurement from a tag
@@ -55,6 +56,12 @@ var settings = func() Tags {
 
 	json.Unmarshal(bytes, &settings)
 	return settings
+}()
+var gateway = func() string {
+	if settings.Gateway == "" {
+		fmt.Println("settings.json: gateway not defined")
+	}
+	return settings.Gateway
 }()
 
 // tagName returns the name of the tag with given MAC address

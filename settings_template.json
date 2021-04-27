@@ -1,4 +1,5 @@
 {
+    "gateway": "https://the.server.com/api/v1/api_name/",
     "tags": [
         {
             "id": "AA:AA:AA:AA:AA:AA",
