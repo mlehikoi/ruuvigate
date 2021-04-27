@@ -1,0 +1,9 @@
+{
+    "tags": [
+        {
+            "id": "AA:AA:AA:AA:AA:AA",
+            "name": "Tag name",
+            "humidityOffset": 0.0
+        }
+    ]
+}

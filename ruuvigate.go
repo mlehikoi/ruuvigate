@@ -2,8 +2,11 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"flag"
 	"fmt"
+	"io/ioutil"
+	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -38,6 +41,32 @@ type Tag struct {
 	Voltage         float32   `json:"voltage"`
 }
 
+// Read the settings json file
+var settings = func() Tags {
+	var settings Tags
+
+	jsonFile, err := os.Open("settings.json")
+	if err != nil {
+		fmt.Println("Couldn't open settings.json")
+		return settings
+	}
+	defer jsonFile.Close()
+	bytes, _ := ioutil.ReadAll(jsonFile)
+
+	json.Unmarshal(bytes, &settings)
+	return settings
+}()
+
+// tagName returns the name of the tag with given MAC address
+func tagName(mac string) string {
+	for _, setting := range settings.Tags {
+		if setting.ID == mac {
+			return setting.Name
+		}
+	}
+	return "unnamed"
+}
+
 func parseRaw(raw []uint8) {
 	parseAccel := func(pos int) float32 {
 		return float32(int16(uint16(raw[pos])<<8|uint16(raw[pos+1]))) / 32767.
@@ -48,6 +77,7 @@ func parseRaw(raw []uint8) {
 				return fmt.Sprintf("%02X:%02X:%02X:%02X:%02X:%02X",
 					raw[39], raw[40], raw[41], raw[42], raw[43], raw[44])
 			}()
+			name := tagName(mac)
 			t := func() float32 {
 				tmp := uint16(raw[22])<<8 | uint16(raw[23])
 				return float32(tmp) * .005
@@ -73,13 +103,14 @@ func parseRaw(raw []uint8) {
 			}()
 
 			if *verbose {
-				fmt.Printf("%v %.2f %.2f %.2f %d\n", mac, t, h, p, mov)
+				fmt.Printf("%v %v %.2f %.2f %.2f %d\n", name, mac, t, h, p, mov)
 			}
-			//fmt.Printf("%v %.2f %.2f %.2f %.2f %d\n", mac, t, h, p, v, m)
+
 			tag := Tag{
 				DataFormat:      5,
 				UpdateAt:        time.Now(),
 				ID:              mac,
+				Name:            name,
 				AccelX:          parseAccel(28),
 				AccelY:          parseAccel(30),
 				AccelZ:          parseAccel(32),
@@ -91,23 +122,11 @@ func parseRaw(raw []uint8) {
 				SeqNo:           seqno,
 				RSSI:            func() int8 { return int8(raw[45]) }(),
 			}
-			// tag.ID = mac
-			// tag.AccelX = parseAccel(28)
-			// tag.AccelY = parseAccel(30)
-			// tag.AccelZ = parseAccel(32)
-			// tag.Temperature = t
-			// tag.Humidity = h
-			// tag.Pressure = p
-			// tag.UpdateAt = time.Now()
-			// tag.Voltage = v
-			// tag.MovementCounter = m
-			// tag.SeqNo = seqno
-			// tag.RSSI = func() int8 { return int8(raw[45]) }()
-			//fmt.Printf("%v %.2f %.2f %.2f %.2f %d\n", mac, t, h, p, v, m)
 
 			tags := Tags{}
 			tags.Tags = append(tags.Tags, tag)
 
+			// Print json contents
 			// tagStr, _ := json.MarshalIndent(tags, "", "  ")
 			// fmt.Println(string(tagStr))
 		}
@@ -160,6 +179,7 @@ func init() {
 
 func main() {
 	flag.Parse()
+
 	scan()
 	parseDump()
 }
