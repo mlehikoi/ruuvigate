@@ -2,10 +2,12 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"os/exec"
 	"strconv"
@@ -14,9 +16,10 @@ import (
 )
 
 type Tags struct {
-	Tags         []Tag  `json:"tags"`
-	Gateway      string `json:"gateway,omitempty"`
-	BatteryLevel int    `json:"batteryLevel"`
+	Tags         []Tag     `json:"tags"`
+	Gateway      string    `json:"gateway,omitempty"`
+	BatteryLevel int       `json:"batteryLevel"`
+	Time         time.Time `json:"time"`
 }
 
 // Tag represents a measurement from a tag
@@ -74,6 +77,29 @@ func tagName(mac string) string {
 	return "unnamed"
 }
 
+func sendUpdate(tags Tags) {
+	if gateway != "" {
+		tagStr, err := json.Marshal(tags)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		if *verbose {
+			fmt.Println(string(tagStr))
+		}
+		resp, err := http.Post(gateway, "application/json", bytes.NewReader(tagStr))
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		defer resp.Body.Close()
+
+		if *verbose {
+			fmt.Println("Status code", resp.StatusCode)
+		}
+	}
+}
+
 func parseRaw(raw []uint8) {
 	parseAccel := func(pos int) float32 {
 		return float32(int16(uint16(raw[pos])<<8|uint16(raw[pos+1]))) / 32767.
@@ -95,7 +121,7 @@ func parseRaw(raw []uint8) {
 			}()
 			p := func() float32 {
 				tmp := uint16(raw[26])<<8 | uint16(raw[27])
-				return float32(uint32(tmp)+50000) / 100.0
+				return float32(uint32(tmp) + 50000)
 			}()
 			v := func() float32 {
 				tmp := uint16(raw[34])<<8 | uint16(raw[35])
@@ -130,12 +156,10 @@ func parseRaw(raw []uint8) {
 				RSSI:            func() int8 { return int8(raw[45]) }(),
 			}
 
-			tags := Tags{}
+			tags := Tags{Time: time.Now()}
 			tags.Tags = append(tags.Tags, tag)
 
-			// Print json contents
-			// tagStr, _ := json.MarshalIndent(tags, "", "  ")
-			// fmt.Println(string(tagStr))
+			sendUpdate(tags)
 		}
 	}
 }
